@@ -82,21 +82,28 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
-
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
+          
       - name: Download FFmpeg
         run: |
           mkdir ffmpeg
-          curl -L https://evermeet.cx/ffmpeg/getrelease/zip -o ffmpeg.zip
-          unzip ffmpeg.zip -d ffmpeg
-          curl -L https://evermeet.cx/ffmpeg/getrelease/zip/ffprobe -o ffprobe.zip
-          unzip ffprobe.zip -d ffmpeg
+          curl -L https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4/darwin-x64 -o ffmpeg/ffmpeg
+          curl -L https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4/darwin-x64 -o ffmpeg/ffprobe
           chmod +x ffmpeg/ffmpeg ffmpeg/ffprobe
 
+      # 或者使用 Homebrew（备选方案）
+      - name: Install FFmpeg using Homebrew
+        if: failure()
+        run: |
+          brew install ffmpeg
+          mkdir -p ffmpeg
+          cp $(which ffmpeg) ffmpeg/
+          cp $(which ffprobe) ffmpeg/
+          
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -108,19 +115,46 @@ jobs:
         run: |
           echo 'import os, sys; os.environ["PATH"] = os.path.join(os.path.dirname(sys.executable), "ffmpeg") + os.pathsep + os.environ["PATH"]' > launcher.py
           cat gui.py >> launcher.py
-
+          
       - name: Build with PyInstaller
         run: |
           pyinstaller --name video2gif --onefile --windowed --add-data "ffmpeg/ffmpeg:ffmpeg" --add-data "ffmpeg/ffprobe:ffmpeg" --add-data "README.md:." launcher.py
-
+          
       - name: Create DMG
         run: |
           cd dist
           mkdir -p video2gif.app/Contents/MacOS
           mkdir -p video2gif.app/Contents/Resources/ffmpeg
           mv video2gif video2gif.app/Contents/MacOS/
+          cp ../ffmpeg/* video2gif.app/Contents/Resources/ffmpeg/
+          
+          # 创建 Info.plist
+          cat > video2gif.app/Contents/Info.plist << EOL
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>video2gif</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.example.video2gif</string>
+              <key>CFBundleName</key>
+              <string>Video2Gif</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.0</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.10</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOL
+          
+          # 创建 DMG
           hdiutil create -volname "Video2Gif" -srcfolder video2gif.app -ov -format UDZO video2gif.dmg
-
+          
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         env:

@@ -2,8 +2,11 @@ name: Build and Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write # 添加这个权限声明
 
 jobs:
   create-release:
@@ -13,7 +16,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Generate version number
         id: version
         run: |
@@ -22,26 +25,26 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          release_name: Release v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true
 
   build-windows:
     needs: create-release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          
+
       - name: Download FFmpeg
         run: |
           mkdir ffmpeg
@@ -49,7 +52,7 @@ jobs:
           7z x ffmpeg.zip -offmpeg
           move ffmpeg\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe ffmpeg\
           move ffmpeg\ffmpeg-master-latest-win64-gpl\bin\ffprobe.exe ffmpeg\
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -61,32 +64,30 @@ jobs:
         run: |
           echo 'import os, sys; os.environ["PATH"] = os.path.join(os.path.dirname(sys.executable), "ffmpeg") + os.pathsep + os.environ["PATH"]' > launcher.py
           type gui.py >> launcher.py
-          
+
       - name: Build with PyInstaller
         run: |
           pyinstaller --name video2gif --onefile --windowed --add-data "ffmpeg/ffmpeg.exe;ffmpeg" --add-data "ffmpeg/ffprobe.exe;ffmpeg" --add-data "README.md;." launcher.py
-          
+
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./dist/video2gif.exe
-          asset_name: video2gif-windows-${{ needs.create-release.outputs.version }}.exe
-          asset_content_type: application/octet-stream
+          tag_name: v${{ needs.create-release.outputs.version }}
+          files: ./dist/video2gif.exe
 
   build-macos:
     needs: create-release
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          
+
       - name: Download FFmpeg
         run: |
           mkdir ffmpeg
@@ -95,7 +96,7 @@ jobs:
           curl -L https://evermeet.cx/ffmpeg/getrelease/zip/ffprobe -o ffprobe.zip
           unzip ffprobe.zip -d ffmpeg
           chmod +x ffmpeg/ffmpeg ffmpeg/ffprobe
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -107,11 +108,11 @@ jobs:
         run: |
           echo 'import os, sys; os.environ["PATH"] = os.path.join(os.path.dirname(sys.executable), "ffmpeg") + os.pathsep + os.environ["PATH"]' > launcher.py
           cat gui.py >> launcher.py
-          
+
       - name: Build with PyInstaller
         run: |
           pyinstaller --name video2gif --onefile --windowed --add-data "ffmpeg/ffmpeg:ffmpeg" --add-data "ffmpeg/ffprobe:ffmpeg" --add-data "README.md:." launcher.py
-          
+
       - name: Create DMG
         run: |
           cd dist
@@ -119,13 +120,11 @@ jobs:
           mkdir -p video2gif.app/Contents/Resources/ffmpeg
           mv video2gif video2gif.app/Contents/MacOS/
           hdiutil create -volname "Video2Gif" -srcfolder video2gif.app -ov -format UDZO video2gif.dmg
-          
+
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./dist/video2gif.dmg
-          asset_name: video2gif-macos-${{ needs.create-release.outputs.version }}.dmg
-          asset_content_type: application/x-apple-diskimage
+          tag_name: v${{ needs.create-release.outputs.version }}
+          files: ./dist/video2gif.dmg

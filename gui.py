@@ -122,38 +122,6 @@ class VideoToGifConverter:
                 "警告", "请拖入视频文件（支持mp4, avi, mov, mkv格式）"
             )
 
-    def check_ffmpeg_installation(self):
-        """检查FFmpeg是否已安装"""
-        installer = FFmpegInstaller()
-        if not installer.check_ffmpeg():
-            # 创建一个临时的root窗口来显示消息框
-            temp_root = tk.Tk()
-            temp_root.withdraw()  # 隐藏临时窗口
-
-            response = messagebox.askquestion(
-                "FFmpeg未安装", "需要安装FFmpeg才能使用本工具。是否查看安装指南？"
-            )
-
-            if response == "yes":
-                dialog = installer.show_installation_dialog()
-                temp_root.wait_window(dialog)  # 等待安装向导窗口关闭
-
-                # 再次检查安装
-                if not installer.check_ffmpeg():
-                    if (
-                        messagebox.askquestion(
-                            "提示", "请安装完FFmpeg后再运行程序。是否退出程序？"
-                        )
-                        == "yes"
-                    ):
-                        temp_root.destroy()
-                        sys.exit()
-            else:
-                temp_root.destroy()
-                sys.exit()
-
-            temp_root.destroy()
-
     def setup_ui(self):
         # 文件选择框
         self.file_frame = ttk.LabelFrame(self.root, text="选择文件")
@@ -339,10 +307,6 @@ class VideoToGifConverter:
     # 修改 convert_video_to_gif 方法
     def convert_video_to_gif(self, video_path):
         try:
-            ffmpeg_path = FFmpegInstaller.get_ffmpeg_path()
-            if ffmpeg_path:
-                # 设置FFmpeg路径
-                ffmpeg.input.DEFAULT_FFMPEG_PATH = ffmpeg_path
             # 确定输出路径
             if self.output_var.get() == "same":
                 output_dir = os.path.dirname(video_path)
@@ -461,13 +425,6 @@ class VideoToGifConverter:
 if __name__ == "__main__":
     try:
         print("程序启动...")
-        # 先单独测试 FFmpeg
-        installer = FFmpegInstaller()
-        ffmpeg_installed = installer.check_ffmpeg()
-        print(f"FFmpeg 检测结果: {ffmpeg_installed}")
-
-        if not ffmpeg_installed:
-            print("FFmpeg 未安装，将显示安装向导...")
 
         app = VideoToGifConverter()
         app.run()

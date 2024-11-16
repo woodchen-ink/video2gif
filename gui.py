@@ -28,27 +28,17 @@ else:  # Linux or others
 class FFmpegInstaller:
     @staticmethod
     def get_ffmpeg_path():
-        """获取FFmpeg可执行文件路径"""
-        try:
-            # 获取程序运行路径
-            if getattr(sys, "frozen", False):
-                # PyInstaller打包后的路径
-                base_path = sys._MEIPASS
-            else:
-                # 开发环境路径
-                base_path = os.path.dirname(os.path.abspath(__file__))
+        if getattr(sys, "frozen", False):
+            # 运行在 PyInstaller 打包后的环境
+            return os.path.join(sys._MEIPASS, "ffmpeg")
+        else:
+            # 运行在开发环境
+            return os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg")
 
-            # FFmpeg路径
-            ffmpeg_dir = os.path.join(base_path, "ffmpeg")
-            if platform.system().lower() == "windows":
-                ffmpeg_path = os.path.join(ffmpeg_dir, "ffmpeg.exe")
-            else:
-                ffmpeg_path = os.path.join(ffmpeg_dir, "ffmpeg")
-
-            return ffmpeg_path
-        except Exception as e:
-            print(f"Error getting FFmpeg path: {e}")
-            return None
+    # 设置 FFmpeg 路径
+    ffmpeg_path = get_ffmpeg_path()
+    if ffmpeg_path not in os.environ["PATH"]:
+        os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
 
     @staticmethod
     def check_ffmpeg():

@@ -335,15 +335,22 @@ class VideoToGifConverter:
             # 打印命令用于调试
             print("调色板生成命令:", " ".join(palette_cmd))
 
+            # 创建 startupinfo 对象（用于隐藏 CMD 窗口）
+            startupinfo = None
+            if platform.system().lower() == "windows":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
             # 运行调色板生成命令
             process = subprocess.Popen(
                 palette_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                startupinfo=(
-                    subprocess.STARTUPINFO()
+                startupinfo=startupinfo,
+                creationflags=(
+                    subprocess.CREATE_NO_WINDOW
                     if platform.system().lower() == "windows"
-                    else None
+                    else 0
                 ),
             )
             _, stderr = process.communicate()
@@ -387,10 +394,11 @@ class VideoToGifConverter:
                 gif_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                startupinfo=(
-                    subprocess.STARTUPINFO()
+                startupinfo=startupinfo,
+                creationflags=(
+                    subprocess.CREATE_NO_WINDOW
                     if platform.system().lower() == "windows"
-                    else None
+                    else 0
                 ),
             )
             _, stderr = process.communicate()

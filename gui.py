@@ -386,23 +386,11 @@ class VideoToGifConverter:
         self.file_frame = ttk.LabelFrame(self.root, text="选择文件")
         self.file_frame.pack(padx=10, pady=5, fill="x")
 
-        # 添加拖放提示框
+        # 添加拖放提示
         if SUPPORT_DND:
-            self.drop_frame = ttk.Frame(self.file_frame, style="Dropzone.TFrame")
-            self.drop_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
-            ttk.Label(self.drop_frame, text="拖放视频文件到这里", font=("", 12)).pack(
-                pady=20
-            )
-
-            # 添加拖放效果
-            self.drop_frame.bind(
-                "<Enter>",
-                lambda e: self.drop_frame.configure(style="DropzoneHover.TFrame"),
-            )
-            self.drop_frame.bind(
-                "<Leave>", lambda e: self.drop_frame.configure(style="Dropzone.TFrame")
-            )
+            ttk.Label(
+                self.file_frame, text="可以直接拖放视频文件到此处", foreground="blue"
+            ).pack(pady=5)
 
         self.files_list = tk.Listbox(self.file_frame, height=5)
         self.files_list.pack(padx=5, pady=5, fill="x")
@@ -410,9 +398,6 @@ class VideoToGifConverter:
         # 如果是macOS，为Listbox添加拖放支持
         if SUPPORT_DND == "macos":
             self.files_list.bind("<<MacDropFiles>>", self.handle_macos_drop)
-
-        self.files_list = tk.Listbox(self.file_frame, height=5)
-        self.files_list.pack(padx=5, pady=5, fill="x")
 
         btn_frame = ttk.Frame(self.file_frame)
         btn_frame.pack(fill="x", padx=5, pady=5)

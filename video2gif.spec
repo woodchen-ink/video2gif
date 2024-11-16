@@ -1,7 +1,4 @@
 # video2gif.spec
-import sys
-from PyInstaller.utils.hooks import collect_data_files
-
 block_cipher = None
 
 a = Analysis(
@@ -13,7 +10,7 @@ a = Analysis(
         ('ffmpeg/ffprobe.exe', 'ffmpeg'),
         ('README.md', '.')
     ],
-    hiddenimports=['tkinter', 'tkinter.ttk', 'tkinterdnd2'],
+    hiddenimports=['ffmpeg', 'ffmpeg-python'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -45,5 +42,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icon.ico'  # 如果你有图标的话
 )

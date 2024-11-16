@@ -6,19 +6,43 @@ import platform
 import os
 import webbrowser
 from threading import Thread
-import ffmpeg
 import traceback
 
 # 在类定义前添加 FFmpeg 路径设置
 if getattr(sys, "frozen", False):
     # 运行在 PyInstaller 打包后的环境
-    ffmpeg_path = os.path.join(sys._MEIPASS, "ffmpeg")
+    ffmpeg_path = os.path.join(
+        sys._MEIPASS,
+        "ffmpeg",
+        "ffmpeg.exe" if platform.system().lower() == "windows" else "ffmpeg",
+    )
+    ffprobe_path = os.path.join(
+        sys._MEIPASS,
+        "ffmpeg",
+        "ffprobe.exe" if platform.system().lower() == "windows" else "ffprobe",
+    )
 else:
     # 运行在开发环境
-    ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg")
+    ffmpeg_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "ffmpeg",
+        "ffmpeg.exe" if platform.system().lower() == "windows" else "ffmpeg",
+    )
+    ffprobe_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "ffmpeg",
+        "ffprobe.exe" if platform.system().lower() == "windows" else "ffprobe",
+    )
 
-if ffmpeg_path not in os.environ["PATH"]:
-    os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
+# 设置 ffmpeg-python 包使用的 FFmpeg 路径
+import ffmpeg
+
+ffmpeg._run.DEFAULT_FFMPEG_PATH = ffmpeg_path
+ffmpeg._run.DEFAULT_FFPROBE_PATH = ffprobe_path
+
+# 添加到系统 PATH
+if os.path.dirname(ffmpeg_path) not in os.environ["PATH"]:
+    os.environ["PATH"] = os.path.dirname(ffmpeg_path) + os.pathsep + os.environ["PATH"]
 
 
 class VideoToGifConverter:
@@ -267,6 +291,16 @@ class VideoToGifConverter:
 
     def convert_video_to_gif(self, video_path):
         try:
+            # 打印环境信息
+            print(f"FFmpeg path: {ffmpeg_path}")
+            print(f"FFprobe path: {ffprobe_path}")
+            print(f"System PATH: {os.environ['PATH']}")
+            # 验证 FFmpeg 是否可用
+            try:
+                version_info = ffmpeg.probe(ffmpeg._run.DEFAULT_FFMPEG_PATH)
+                print(f"FFmpeg version info: {version_info}")
+            except Exception as e:
+                print(f"FFmpeg probe error: {e}")
             # 验证输入
             if not self.validate_inputs():
                 return False
@@ -362,6 +396,8 @@ class VideoToGifConverter:
         except Exception as e:
             error_msg = str(e)
             print(f"Conversion error: {error_msg}")
+            print(f"Error type: {type(e)}")
+            traceback.print_exc()
             messagebox.showerror("错误", f"转换失败:\n{error_msg}")
             return False
 

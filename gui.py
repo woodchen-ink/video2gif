@@ -7,7 +7,7 @@ import os
 import webbrowser
 from threading import Thread
 import ffmpeg
-import traceback  # 用于打印详细错误信息
+import traceback
 
 # 根据平台选择拖放实现
 PLATFORM = platform.system().lower()
@@ -24,250 +24,20 @@ elif PLATFORM == "darwin":  # macOS
 else:  # Linux or others
     SUPPORT_DND = None
 
+# 设置 FFmpeg 路径
+if getattr(sys, "frozen", False):
+    # 运行在 PyInstaller 打包后的环境
+    ffmpeg_path = os.path.join(sys._MEIPASS, "ffmpeg")
+else:
+    # 运行在开发环境
+    ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg")
 
-class FFmpegInstaller:
-    @staticmethod
-    def get_ffmpeg_path():
-        if getattr(sys, "frozen", False):
-            # 运行在 PyInstaller 打包后的环境
-            return os.path.join(sys._MEIPASS, "ffmpeg")
-        else:
-            # 运行在开发环境
-            return os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg")
-
-    # 设置 FFmpeg 路径
-    ffmpeg_path = get_ffmpeg_path()
-    if ffmpeg_path not in os.environ["PATH"]:
-        os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
-
-    @staticmethod
-    def check_ffmpeg():
-        """检查是否可以使用FFmpeg"""
-        try:
-            ffmpeg_path = FFmpegInstaller.get_ffmpeg_path()
-            if ffmpeg_path and os.path.exists(ffmpeg_path):
-                # 使用打包的FFmpeg
-                if platform.system().lower() == "windows":
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    result = subprocess.run(
-                        [ffmpeg_path, "-version"],
-                        capture_output=True,
-                        startupinfo=startupinfo,
-                    )
-                else:
-                    result = subprocess.run(
-                        [ffmpeg_path, "-version"], capture_output=True
-                    )
-                return result.returncode == 0
-
-            # 尝试系统PATH中的FFmpeg
-            if platform.system().lower() == "windows":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                result = subprocess.run(
-                    ["ffmpeg", "-version"], capture_output=True, startupinfo=startupinfo
-                )
-            else:
-                result = subprocess.run(["ffmpeg", "-version"], capture_output=True)
-            return result.returncode == 0
-
-        except FileNotFoundError:
-            return False
-        except Exception as e:
-            print(f"FFmpeg检测出错: {str(e)}")
-            return False
-
-    @staticmethod
-    def get_system_info():
-        """获取系统信息"""
-        system = platform.system().lower()
-        is_64bits = sys.maxsize > 2**32
-        return system, is_64bits
-
-    def show_installation_dialog(self):
-        """显示安装向导对话框"""
-        system, is_64bits = self.get_system_info()
-
-        dialog = tk.Toplevel()
-        dialog.title("FFmpeg 安装向导")
-        dialog.geometry("500x400")
-        dialog.transient()  # 设置为模态窗口
-
-        # 添加说明文本
-        ttk.Label(
-            dialog,
-            text="未检测到 FFmpeg，需要先安装 FFmpeg 才能继续使用。",
-            wraplength=450,
-        ).pack(padx=20, pady=10)
-
-        if system == "windows":
-            self._setup_windows_installer(dialog)
-        elif system == "darwin":  # macOS
-            self._setup_macos_installer(dialog)
-        elif system == "linux":
-            self._setup_linux_installer(dialog)
-        else:
-            self._setup_manual_installer(dialog)
-
-        dialog.focus_set()
-        return dialog
-
-    def _setup_windows_installer(self, dialog):
-        """Windows安装方式"""
-        ttk.Label(dialog, text="Windows 安装方式：", font=("", 10, "bold")).pack(
-            padx=20, pady=5
-        )
-
-        # 方式1: Chocolatey
-        choco_frame = ttk.LabelFrame(dialog, text="方式1：使用 Chocolatey（推荐）")
-        choco_frame.pack(padx=20, pady=5, fill="x")
-
-        ttk.Label(
-            choco_frame,
-            text="1. 首先安装 Chocolatey，在管理员权限的 PowerShell 中运行：",
-            wraplength=450,
-        ).pack(padx=5, pady=5)
-
-        choco_cmd = """Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"""
-        cmd_text = ttk.Entry(choco_frame, width=50)
-        cmd_text.insert(0, choco_cmd)
-        cmd_text.pack(padx=5, pady=5)
-
-        ttk.Button(
-            choco_frame,
-            text="复制命令",
-            command=lambda: self._copy_to_clipboard(choco_cmd),
-        ).pack(pady=5)
-
-        ttk.Label(choco_frame, text="2. 然后安装 FFmpeg，运行：").pack(padx=5, pady=5)
-
-        ffmpeg_cmd = "choco install ffmpeg"
-        cmd_text2 = ttk.Entry(choco_frame, width=50)
-        cmd_text2.insert(0, ffmpeg_cmd)
-        cmd_text2.pack(padx=5, pady=5)
-
-        ttk.Button(
-            choco_frame,
-            text="复制命令",
-            command=lambda: self._copy_to_clipboard(ffmpeg_cmd),
-        ).pack(pady=5)
-
-        # 方式2: 直接下载
-        direct_frame = ttk.LabelFrame(dialog, text="方式2：直接下载")
-        direct_frame.pack(padx=20, pady=5, fill="x")
-
-        ttk.Label(direct_frame, text="从官方网站下载并手动配置环境变量：").pack(
-            padx=5, pady=5
-        )
-
-        ttk.Button(
-            direct_frame,
-            text="打开下载页面",
-            command=lambda: webbrowser.open("https://ffmpeg.org/download.html"),
-        ).pack(pady=5)
-
-    def _setup_macos_installer(self, dialog):
-        """macOS安装方式"""
-        ttk.Label(dialog, text="macOS 安装方式：", font=("", 10, "bold")).pack(
-            padx=20, pady=5
-        )
-
-        # 方式1: Homebrew
-        brew_frame = ttk.LabelFrame(dialog, text="方式1：使用 Homebrew（推荐）")
-        brew_frame.pack(padx=20, pady=5, fill="x")
-
-        ttk.Label(
-            brew_frame, text="1. 首先安装 Homebrew，在终端运行：", wraplength=450
-        ).pack(padx=5, pady=5)
-
-        brew_cmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-        cmd_text = ttk.Entry(brew_frame, width=50)
-        cmd_text.insert(0, brew_cmd)
-        cmd_text.pack(padx=5, pady=5)
-
-        ttk.Button(
-            brew_frame,
-            text="复制命令",
-            command=lambda: self._copy_to_clipboard(brew_cmd),
-        ).pack(pady=5)
-
-        ttk.Label(brew_frame, text="2. 然后安装 FFmpeg，运行：").pack(padx=5, pady=5)
-
-        ffmpeg_cmd = "brew install ffmpeg"
-        cmd_text2 = ttk.Entry(brew_frame, width=50)
-        cmd_text2.insert(0, ffmpeg_cmd)
-        cmd_text2.pack(padx=5, pady=5)
-
-        ttk.Button(
-            brew_frame,
-            text="复制命令",
-            command=lambda: self._copy_to_clipboard(ffmpeg_cmd),
-        ).pack(pady=5)
-
-    def _setup_linux_installer(self, dialog):
-        """Linux安装方式"""
-        ttk.Label(dialog, text="Linux 安装方式：", font=("", 10, "bold")).pack(
-            padx=20, pady=5
-        )
-
-        # Ubuntu/Debian
-        ubuntu_frame = ttk.LabelFrame(dialog, text="Ubuntu/Debian")
-        ubuntu_frame.pack(padx=20, pady=5, fill="x")
-
-        ubuntu_cmd = "sudo apt update && sudo apt install ffmpeg"
-        cmd_text = ttk.Entry(ubuntu_frame, width=50)
-        cmd_text.insert(0, ubuntu_cmd)
-        cmd_text.pack(padx=5, pady=5)
-
-        ttk.Button(
-            ubuntu_frame,
-            text="复制命令",
-            command=lambda: self._copy_to_clipboard(ubuntu_cmd),
-        ).pack(pady=5)
-
-        # CentOS/RHEL
-        centos_frame = ttk.LabelFrame(dialog, text="CentOS/RHEL")
-        centos_frame.pack(padx=20, pady=5, fill="x")
-
-        centos_cmd = "sudo yum install epel-release && sudo yum install ffmpeg"
-        cmd_text2 = ttk.Entry(centos_frame, width=50)
-        cmd_text2.insert(0, centos_cmd)
-        cmd_text2.pack(padx=5, pady=5)
-
-        ttk.Button(
-            centos_frame,
-            text="复制命令",
-            command=lambda: self._copy_to_clipboard(centos_cmd),
-        ).pack(pady=5)
-
-    def _setup_manual_installer(self, dialog):
-        """手动安装说明"""
-        ttk.Label(
-            dialog, text="请访问 FFmpeg 官方网站下载并安装：", wraplength=450
-        ).pack(padx=20, pady=10)
-
-        ttk.Button(
-            dialog,
-            text="打开 FFmpeg 官方网站",
-            command=lambda: webbrowser.open("https://ffmpeg.org/download.html"),
-        ).pack(pady=10)
-
-    def _copy_to_clipboard(self, text):
-        """复制文本到剪贴板"""
-        dialog = tk.Toplevel()
-        dialog.withdraw()
-        dialog.clipboard_clear()
-        dialog.clipboard_append(text)
-        dialog.update()
-        dialog.destroy()
-        messagebox.showinfo("提示", "命令已复制到剪贴板！")
+if ffmpeg_path not in os.environ["PATH"]:
+    os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
 
 
 class VideoToGifConverter:
     def __init__(self):
-        self.check_ffmpeg_installation()
-
         # 创建主窗口
         if SUPPORT_DND == "tkdnd":
             self.root = TkinterDnD.Tk()

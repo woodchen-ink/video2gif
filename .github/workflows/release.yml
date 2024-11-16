@@ -60,25 +60,9 @@ jobs:
           pip install tkinterdnd2>=0.4.2
           pip install pyinstaller
 
-      # 创建启动器脚本
-      - name: Create launcher script
-        run: |
-          echo import os, sys > launcher.py
-          echo if getattr(sys, 'frozen', False^): >> launcher.py
-          echo     os.environ["PATH"] = os.path.join(os.path.dirname(sys.executable^), "ffmpeg"^) + os.pathsep + os.environ["PATH"] >> launcher.py
-          echo else: >> launcher.py
-          echo     os.environ["PATH"] = os.path.join(os.path.dirname(os.path.abspath(__file__^)^), "ffmpeg"^) + os.pathsep + os.environ["PATH"] >> launcher.py
-          type gui.py >> launcher.py
-
       - name: Build with PyInstaller
         run: |
-          pyinstaller --clean video2gif.spec
-
-      # 测试程序是否可以启动
-      - name: Test executable
-        run: |
-          cd dist
-          .\video2gif.exe --version || echo "Program started"
+          pyinstaller --name video2gif --onefile --windowed --add-data "ffmpeg/ffmpeg.exe;ffmpeg" --add-data "ffmpeg/ffprobe.exe;ffmpeg" --add-data "README.md;." launcher.py
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1

@@ -62,7 +62,7 @@ jobs:
       - name: Build with PyInstaller
         shell: cmd
         run: |
-          pyinstaller --clean video2gif.spec
+          pyinstaller --name video2gif --onefile --windowed --hidden-import ffmpeg --add-data "ffmpeg/ffmpeg.exe;ffmpeg" --add-data "ffmpeg/ffprobe.exe;ffmpeg" --add-data "README.md;." --clean --noconfirm --log-level=INFO gui.py
 
 
       - name: Upload Release Asset

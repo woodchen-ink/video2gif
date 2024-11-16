@@ -8,41 +8,17 @@ import webbrowser
 from threading import Thread
 import traceback
 
-# 在类定义前添加 FFmpeg 路径设置
+# 设置 FFmpeg 路径
 if getattr(sys, "frozen", False):
     # 运行在 PyInstaller 打包后的环境
-    ffmpeg_path = os.path.join(
-        sys._MEIPASS,
-        "ffmpeg",
-        "ffmpeg.exe" if platform.system().lower() == "windows" else "ffmpeg",
-    )
-    ffprobe_path = os.path.join(
-        sys._MEIPASS,
-        "ffmpeg",
-        "ffprobe.exe" if platform.system().lower() == "windows" else "ffprobe",
-    )
+    ffmpeg_path = os.path.join(sys._MEIPASS, "ffmpeg")
 else:
     # 运行在开发环境
-    ffmpeg_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "ffmpeg",
-        "ffmpeg.exe" if platform.system().lower() == "windows" else "ffmpeg",
-    )
-    ffprobe_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "ffmpeg",
-        "ffprobe.exe" if platform.system().lower() == "windows" else "ffprobe",
-    )
-
-# 设置 ffmpeg-python 包使用的 FFmpeg 路径
-import ffmpeg
-
-ffmpeg._run.DEFAULT_FFMPEG_PATH = ffmpeg_path
-ffmpeg._run.DEFAULT_FFPROBE_PATH = ffprobe_path
+    ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg")
 
 # 添加到系统 PATH
-if os.path.dirname(ffmpeg_path) not in os.environ["PATH"]:
-    os.environ["PATH"] = os.path.dirname(ffmpeg_path) + os.pathsep + os.environ["PATH"]
+if ffmpeg_path not in os.environ["PATH"]:
+    os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
 
 
 class VideoToGifConverter:
@@ -291,19 +267,10 @@ class VideoToGifConverter:
 
     def convert_video_to_gif(self, video_path):
         try:
-            # 打印环境信息
-            print(f"FFmpeg path: {ffmpeg_path}")
-            print(f"FFprobe path: {ffprobe_path}")
-            print(f"System PATH: {os.environ['PATH']}")
-            # 验证 FFmpeg 是否可用
-            try:
-                version_info = ffmpeg.probe(ffmpeg._run.DEFAULT_FFMPEG_PATH)
-                print(f"FFmpeg version info: {version_info}")
-            except Exception as e:
-                print(f"FFmpeg probe error: {e}")
             # 验证输入
             if not self.validate_inputs():
                 return False
+
             # 确定输出路径
             if self.output_var.get() == "same":
                 output_dir = os.path.dirname(video_path)
@@ -328,64 +295,108 @@ class VideoToGifConverter:
             cpu_count = os.cpu_count() or 1
             threads = max(1, min(cpu_count - 1, 8))  # 留一个核心给系统用
 
+            # 获取ffmpeg路径
+            ffmpeg_exe = os.path.join(
+                ffmpeg_path,
+                "ffmpeg.exe" if platform.system().lower() == "windows" else "ffmpeg",
+            )
+
+            # 构建基本命令
+            filter_complex = f"fps={fps}"  # 开始构建滤镜链
+
+            # 添加尺寸控制到滤镜链
+            if self.size_var.get() == "custom":
+                width = int(self.width_var.get())
+                height = self.height_var.get()
+                height = -1 if height == "auto" else int(height)
+                filter_complex += f",scale={width}:{height}"
+
             # 更新状态显示
             self.status_label.config(
                 text=f"正在生成调色板... {os.path.basename(video_path)}"
             )
             self.root.update()
-            # 第一步：生成调色板（添加线程参数）
-            stream = ffmpeg.input(video_path)
 
+            # 构建调色板生成命令
+            palette_cmd = [ffmpeg_exe, "-y", "-threads", str(threads)]  # 覆盖输出文件
+
+            # 添加时间控制
             if start_time > 0:
-                stream = ffmpeg.filter(stream, "setpts", f"PTS-{start_time}/TB")
+                palette_cmd.extend(["-ss", str(start_time)])
+
+            palette_cmd.extend(["-i", video_path])
 
             if duration:
-                stream = ffmpeg.filter(stream, "t", duration=float(duration))
+                palette_cmd.extend(["-t", str(float(duration))])
 
-            stream = ffmpeg.filter(stream, "fps", fps=fps)
+            # 添加滤镜和输出
+            palette_cmd.extend(["-vf", f"{filter_complex},palettegen", palette_path])
 
-            if self.size_var.get() == "custom":
-                width = int(self.width_var.get())
-                height = self.height_var.get()
-                height = -1 if height == "auto" else int(height)
-                stream = ffmpeg.filter(stream, "scale", width=width, height=height)
+            # 打印命令用于调试
+            print("调色板生成命令:", " ".join(palette_cmd))
 
-            stream = ffmpeg.filter(stream, "palettegen")
-            # 添加线程参数
-            ffmpeg.run(
-                ffmpeg.output(stream, palette_path, threads=threads),
-                overwrite_output=True,
+            # 运行调色板生成命令
+            process = subprocess.Popen(
+                palette_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                startupinfo=(
+                    subprocess.STARTUPINFO()
+                    if platform.system().lower() == "windows"
+                    else None
+                ),
             )
+            _, stderr = process.communicate()
+
+            if process.returncode != 0:
+                raise RuntimeError(f"调色板生成失败: {stderr.decode()}")
 
             # 更新状态显示
             self.status_label.config(
                 text=f"正在生成GIF... {os.path.basename(video_path)}"
             )
             self.root.update()
-            # 第二步：使用调色板生成GIF（添加线程参数）
-            stream = ffmpeg.input(video_path)
-            palette = ffmpeg.input(palette_path)
 
+            # 构建GIF生成命令
+            gif_cmd = [ffmpeg_exe, "-y", "-threads", str(threads)]
+
+            # 添加时间控制
             if start_time > 0:
-                stream = ffmpeg.filter(stream, "setpts", f"PTS-{start_time}/TB")
+                gif_cmd.extend(["-ss", str(start_time)])
+
+            gif_cmd.extend(["-i", video_path])
 
             if duration:
-                stream = ffmpeg.filter(stream, "t", duration=float(duration))
+                gif_cmd.extend(["-t", str(float(duration))])
 
-            stream = ffmpeg.filter(stream, "fps", fps=fps)
-
-            if self.size_var.get() == "custom":
-                width = int(self.width_var.get())
-                height = self.height_var.get()
-                height = -1 if height == "auto" else int(height)
-                stream = ffmpeg.filter(stream, "scale", width=width, height=height)
-
-            stream = ffmpeg.filter([stream, palette], "paletteuse")
-            # 添加线程参数
-            ffmpeg.run(
-                ffmpeg.output(stream, output_path, threads=threads),
-                overwrite_output=True,
+            gif_cmd.extend(
+                [
+                    "-i",
+                    palette_path,
+                    "-lavfi",
+                    f"{filter_complex} [x]; [x][1:v] paletteuse",
+                    output_path,
+                ]
             )
+
+            # 打印命令用于调试
+            print("GIF生成命令:", " ".join(gif_cmd))
+
+            # 运行GIF生成命令
+            process = subprocess.Popen(
+                gif_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                startupinfo=(
+                    subprocess.STARTUPINFO()
+                    if platform.system().lower() == "windows"
+                    else None
+                ),
+            )
+            _, stderr = process.communicate()
+
+            if process.returncode != 0:
+                raise RuntimeError(f"GIF生成失败: {stderr.decode()}")
 
             # 删除临时调色板文件
             if os.path.exists(palette_path):

@@ -9,13 +9,20 @@ from threading import Thread
 import ffmpeg
 import traceback  # 用于打印详细错误信息
 
-try:
-    from tkinterdnd2 import *
+# 根据平台选择拖放实现
+PLATFORM = platform.system().lower()
 
-    SUPPORT_DND = True
-except ImportError:
-    SUPPORT_DND = False
-    print("Warning: tkinterdnd2 not available, drag and drop support will be disabled")
+if PLATFORM == "windows":
+    try:
+        from tkinterdnd2 import DND_FILES, TkinterDnD
+
+        SUPPORT_DND = "tkdnd"
+    except ImportError:
+        SUPPORT_DND = None
+elif PLATFORM == "darwin":  # macOS
+    SUPPORT_DND = "macos"
+else:  # Linux or others
+    SUPPORT_DND = None
 
 
 class FFmpegInstaller:
@@ -271,20 +278,59 @@ class VideoToGifConverter:
     def __init__(self):
         self.check_ffmpeg_installation()
 
-        # 根据是否支持拖放来创建不同的根窗口
-        if SUPPORT_DND:
+        # 创建主窗口
+        if SUPPORT_DND == "tkdnd":
             self.root = TkinterDnD.Tk()
         else:
             self.root = tk.Tk()
 
         self.root.title("视频转GIF工具")
 
-        # 只在支持拖放时启用相关功能
-        if SUPPORT_DND:
+        # 设置拖放支持
+        self.setup_dnd()
+
+        # 设置UI
+        self.setup_ui()
+
+    def setup_dnd(self):
+        """设置拖放支持"""
+        if SUPPORT_DND == "tkdnd":
+            # Windows with tkinterdnd2
             self.root.drop_target_register(DND_FILES)
             self.root.dnd_bind("<<Drop>>", self.handle_drop)
+        elif SUPPORT_DND == "macos":
+            # macOS native drag and drop
+            self.root.bind("<<MacDropFiles>>", self.handle_macos_drop)
+            # 启用macOS拖放
+            self.root.tk.call("tk_getOpenFile", "-setup")
+        else:
+            print("Drag and drop not supported on this platform")
 
-        self.setup_ui()
+    def handle_drop(self, event):
+        """处理Windows下的文件拖放"""
+        files = self.root.tk.splitlist(event.data)
+        self.process_dropped_files(files)
+
+    def handle_macos_drop(self, event):
+        """处理macOS下的文件拖放"""
+        # macOS下获取拖放的文件路径
+        files = self.root.tk.splitlist(self.root.tk.call("::tk::mac::GetDroppedFiles"))
+        self.process_dropped_files(files)
+
+    def process_dropped_files(self, files):
+        """处理拖放的文件"""
+        # 过滤出视频文件
+        valid_extensions = (".mp4", ".avi", ".mov", ".mkv")
+        valid_files = [f for f in files if f.lower().endswith(valid_extensions)]
+
+        if valid_files:
+            self.files_list.delete(0, tk.END)
+            for file in valid_files:
+                self.files_list.insert(tk.END, file)
+        else:
+            messagebox.showwarning(
+                "警告", "请拖入视频文件（支持mp4, avi, mov, mkv格式）"
+            )
 
     # 添加拖放处理方法
     def handle_drop(self, event):
@@ -339,6 +385,31 @@ class VideoToGifConverter:
         # 文件选择框
         self.file_frame = ttk.LabelFrame(self.root, text="选择文件")
         self.file_frame.pack(padx=10, pady=5, fill="x")
+
+        # 添加拖放提示框
+        if SUPPORT_DND:
+            self.drop_frame = ttk.Frame(self.file_frame, style="Dropzone.TFrame")
+            self.drop_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+            ttk.Label(self.drop_frame, text="拖放视频文件到这里", font=("", 12)).pack(
+                pady=20
+            )
+
+            # 添加拖放效果
+            self.drop_frame.bind(
+                "<Enter>",
+                lambda e: self.drop_frame.configure(style="DropzoneHover.TFrame"),
+            )
+            self.drop_frame.bind(
+                "<Leave>", lambda e: self.drop_frame.configure(style="Dropzone.TFrame")
+            )
+
+        self.files_list = tk.Listbox(self.file_frame, height=5)
+        self.files_list.pack(padx=5, pady=5, fill="x")
+
+        # 如果是macOS，为Listbox添加拖放支持
+        if SUPPORT_DND == "macos":
+            self.files_list.bind("<<MacDropFiles>>", self.handle_macos_drop)
 
         self.files_list = tk.Listbox(self.file_frame, height=5)
         self.files_list.pack(padx=5, pady=5, fill="x")

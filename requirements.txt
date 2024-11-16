@@ -1,6 +1,7 @@
 # 核心依赖
-ffmpeg-python>=0.2.0    # FFmpeg Python绑定
-Pillow>=9.0.0          # 图像处理库
+ffmpeg-python>=0.2.0
+Pillow>=9.0.0
 
-# GUI增强
-tkinterdnd2>=0.4.2     # 修改为最新的可用版本
+# Windows平台依赖
+tkinterdnd2>=0.4.2; platform_system=="Windows"
+# Mac平台可以使用其他方案，暂时不需要特殊依赖

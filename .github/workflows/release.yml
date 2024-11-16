@@ -3,6 +3,7 @@ name: Build and Release
 on:
   push:
     branches: [main]
+    paths-ignore: [**.md]
   workflow_dispatch:
 
 permissions:

@@ -9,7 +9,7 @@ from threading import Thread
 import ffmpeg
 import traceback
 
-# 设置 FFmpeg 路径
+# 在类定义前添加 FFmpeg 路径设置
 if getattr(sys, "frozen", False):
     # 运行在 PyInstaller 打包后的环境
     ffmpeg_path = os.path.join(sys._MEIPASS, "ffmpeg")
@@ -20,29 +20,11 @@ else:
 if ffmpeg_path not in os.environ["PATH"]:
     os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
 
-# 尝试导入拖放支持
-SUPPORT_DND = False
-if platform.system().lower() == "windows":
-    try:
-        from tkinterdnd2 import DND_FILES, TkinterDnD
-
-        SUPPORT_DND = True
-    except ImportError:
-        pass
-
 
 class VideoToGifConverter:
     def __init__(self):
         # 创建主窗口
-        if SUPPORT_DND:
-            try:
-                self.root = TkinterDnD.Tk()
-            except Exception:
-                self.root = tk.Tk()
-                SUPPORT_DND = False
-        else:
-            self.root = tk.Tk()
-
+        self.root = tk.Tk()
         self.root.title("视频转GIF工具")
 
         # 设置窗口大小和位置
@@ -53,92 +35,31 @@ class VideoToGifConverter:
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-
-        # 设置拖放支持
-        if SUPPORT_DND:
-            try:
-                self.root.drop_target_register(DND_FILES)
-                self.root.dnd_bind("<<Drop>>", self.handle_drop)
-            except Exception:
-                SUPPORT_DND = False
+        # 设置窗口样式
+        self.root.configure(bg="#f0f0f0")
+        style = ttk.Style()
+        style.configure("TButton", padding=6)
+        style.configure("TLabelframe", background="#f0f0f0")
 
         # 设置UI
         self.setup_ui()
-
-    def setup_dnd(self):
-        """设置拖放支持"""
-        if SUPPORT_DND == "tkdnd":
-            # Windows with tkinterdnd2
-            self.root.drop_target_register(DND_FILES)
-            self.root.dnd_bind("<<Drop>>", self.handle_drop)
-        elif SUPPORT_DND == "macos":
-            # macOS native drag and drop
-            self.root.bind("<<MacDropFiles>>", self.handle_macos_drop)
-            # 启用macOS拖放
-            self.root.tk.call("tk_getOpenFile", "-setup")
-        else:
-            print("Drag and drop not supported on this platform")
-
-    def handle_drop(self, event):
-        """处理Windows下的文件拖放"""
-        files = self.root.tk.splitlist(event.data)
-        self.process_dropped_files(files)
-
-    def handle_macos_drop(self, event):
-        """处理macOS下的文件拖放"""
-        # macOS下获取拖放的文件路径
-        files = self.root.tk.splitlist(self.root.tk.call("::tk::mac::GetDroppedFiles"))
-        self.process_dropped_files(files)
-
-    def process_dropped_files(self, files):
-        """处理拖放的文件"""
-        # 过滤出视频文件
-        valid_extensions = (".mp4", ".avi", ".mov", ".mkv")
-        valid_files = [f for f in files if f.lower().endswith(valid_extensions)]
-
-        if valid_files:
-            self.files_list.delete(0, tk.END)
-            for file in valid_files:
-                self.files_list.insert(tk.END, file)
-        else:
-            messagebox.showwarning(
-                "警告", "请拖入视频文件（支持mp4, avi, mov, mkv格式）"
-            )
-
-    # 添加拖放处理方法
-    def handle_drop(self, event):
-        """处理文件拖放"""
-        files = self.root.tk.splitlist(event.data)
-        # 过滤出视频文件
-        valid_extensions = (".mp4", ".avi", ".mov", ".mkv")
-        valid_files = [f for f in files if f.lower().endswith(valid_extensions)]
-
-        if valid_files:
-            self.files_list.delete(0, tk.END)
-            for file in valid_files:
-                self.files_list.insert(tk.END, file)
-        else:
-            messagebox.showwarning(
-                "警告", "请拖入视频文件（支持mp4, avi, mov, mkv格式）"
-            )
 
     def setup_ui(self):
         # 文件选择框
         self.file_frame = ttk.LabelFrame(self.root, text="选择文件")
         self.file_frame.pack(padx=10, pady=5, fill="x")
 
-        # 添加拖放提示
-        if SUPPORT_DND:
-            ttk.Label(
-                self.file_frame, text="可以直接拖放视频文件到此处", foreground="blue"
-            ).pack(pady=5)
-
         self.files_list = tk.Listbox(self.file_frame, height=5)
         self.files_list.pack(padx=5, pady=5, fill="x")
 
-        # 如果是macOS，为Listbox添加拖放支持
-        if SUPPORT_DND == "macos":
-            self.files_list.bind("<<MacDropFiles>>", self.handle_macos_drop)
+        # 为文件列表添加右键菜单
+        self.files_list_menu = tk.Menu(self.root, tearoff=0)
+        self.files_list_menu.add_command(label="删除选中", command=self.delete_selected)
+        self.files_list_menu.add_command(
+            label="清空列表", command=lambda: self.files_list.delete(0, tk.END)
+        )
+
+        self.files_list.bind("<Button-3>", self.show_context_menu)
 
         btn_frame = ttk.Frame(self.file_frame)
         btn_frame.pack(fill="x", padx=5, pady=5)
@@ -272,14 +193,19 @@ class VideoToGifConverter:
         # 状态标签
         self.status_label = ttk.Label(self.root, text="就绪")
         self.status_label.pack(pady=5)
-        # 如果不支持拖放，添加提示
-        if not SUPPORT_DND:
-            ttk.Label(
-                self.file_frame,
-                text="注意：当前版本不支持拖放功能，请使用'选择视频'按钮",
-                wraplength=300,
-                foreground="red",
-            ).pack(pady=5)
+
+    def show_context_menu(self, event):
+        """显示右键菜单"""
+        try:
+            self.files_list_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.files_list_menu.grab_release()
+
+    def delete_selected(self):
+        """删除选中的文件"""
+        selection = self.files_list.curselection()
+        for index in reversed(selection):
+            self.files_list.delete(index)
 
     def browse_output(self):
         directory = filedialog.askdirectory()
@@ -304,9 +230,46 @@ class VideoToGifConverter:
         else:
             return ["-quality", "50"]
 
-    # 修改 convert_video_to_gif 方法
+    def validate_inputs(self):
+        """验证输入参数"""
+        try:
+            # 验证FPS
+            fps = int(self.fps_var.get())
+            if fps <= 0:
+                raise ValueError("FPS必须大于0")
+
+            # 验证时间设置
+            start_time = float(self.start_time_var.get() or 0)
+            if start_time < 0:
+                raise ValueError("开始时间不能为负数")
+
+            if self.duration_var.get():
+                duration = float(self.duration_var.get())
+                if duration <= 0:
+                    raise ValueError("持续时间必须大于0")
+
+            # 验证自定义尺寸
+            if self.size_var.get() == "custom":
+                width = int(self.width_var.get())
+                if width <= 0:
+                    raise ValueError("宽度必须大于0")
+
+                height = self.height_var.get()
+                if height != "auto":
+                    height = int(height)
+                    if height <= 0:
+                        raise ValueError("高度必须大于0")
+
+            return True
+        except ValueError as e:
+            messagebox.showerror("输入错误", str(e))
+            return False
+
     def convert_video_to_gif(self, video_path):
         try:
+            # 验证输入
+            if not self.validate_inputs():
+                return False
             # 确定输出路径
             if self.output_var.get() == "same":
                 output_dir = os.path.dirname(video_path)
@@ -331,6 +294,11 @@ class VideoToGifConverter:
             cpu_count = os.cpu_count() or 1
             threads = max(1, min(cpu_count - 1, 8))  # 留一个核心给系统用
 
+            # 更新状态显示
+            self.status_label.config(
+                text=f"正在生成调色板... {os.path.basename(video_path)}"
+            )
+            self.root.update()
             # 第一步：生成调色板（添加线程参数）
             stream = ffmpeg.input(video_path)
 
@@ -355,6 +323,11 @@ class VideoToGifConverter:
                 overwrite_output=True,
             )
 
+            # 更新状态显示
+            self.status_label.config(
+                text=f"正在生成GIF... {os.path.basename(video_path)}"
+            )
+            self.root.update()
             # 第二步：使用调色板生成GIF（添加线程参数）
             stream = ffmpeg.input(video_path)
             palette = ffmpeg.input(palette_path)
@@ -394,25 +367,44 @@ class VideoToGifConverter:
 
     def start_conversion(self):
         def convert():
-            files = self.files_list.get(0, tk.END)
-            if not files:
-                messagebox.showwarning("警告", "请先选择要转换的视频文件")
-                return
+            try:
+                files = self.files_list.get(0, tk.END)
+                if not files:
+                    messagebox.showwarning("警告", "请先选择要转换的视频文件")
+                    return
 
-            total = len(files)
+                total = len(files)
+                success_count = 0
 
-            for i, file in enumerate(files):
-                current = i + 1
-                self.status_label.config(
-                    text=f"正在转换: {os.path.basename(file)} ({current}/{total})"
-                )
-                success = self.convert_video_to_gif(file)
-                progress = current / total * 100
-                self.progress["value"] = progress
+                for i, file in enumerate(files):
+                    current = i + 1
+                    self.status_label.config(
+                        text=f"正在转换: {os.path.basename(file)} ({current}/{total})"
+                    )
+                    if self.convert_video_to_gif(file):
+                        success_count += 1
+                    progress = current / total * 100
+                    self.progress["value"] = progress
 
-            self.status_label.config(text=f"转换完成 ({total}/{total})")
-            self.convert_btn["state"] = "normal"
-            messagebox.showinfo("完成", f"所有文件转换完成！\n成功转换 {total} 个文件")
+                self.status_label.config(text=f"转换完成 ({success_count}/{total})")
+                self.convert_btn["state"] = "normal"
+
+                if success_count == total:
+                    messagebox.showinfo(
+                        "完成", f"所有文件转换完成！\n成功转换 {total} 个文件"
+                    )
+                else:
+                    messagebox.showwarning(
+                        "完成",
+                        f"转换完成，但有部分失败。\n成功：{success_count}/{total}",
+                    )
+
+            except Exception as e:
+                print(f"Conversion error: {str(e)}")
+                traceback.print_exc()
+                messagebox.showerror("错误", f"转换过程出错：\n{str(e)}")
+            finally:
+                self.convert_btn["state"] = "normal"
 
         self.convert_btn["state"] = "disabled"
         self.progress["value"] = 0

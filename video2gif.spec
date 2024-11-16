@@ -45,5 +45,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icons/favicon.ico'  # 如果你有图标的话
+    icon='icon.ico'  # 如果你有图标的话
 )

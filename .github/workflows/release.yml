@@ -43,7 +43,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Download FFmpeg
         run: |
@@ -86,7 +86,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.11'
           
       - name: Download FFmpeg
         run: |
@@ -107,7 +107,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # 安装基本依赖，排除tkinterdnd2
+          pip install ffmpeg-python Pillow
+          # 尝试安装tkinterdnd2，但允许失败
+          pip install tkinterdnd2 || echo "tkinterdnd2 installation failed, continuing without it"
           pip install pyinstaller
 
       # 创建启动器脚本

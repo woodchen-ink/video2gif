@@ -1,13 +1,6 @@
 # 核心依赖
 ffmpeg-python>=0.2.0    # FFmpeg Python绑定
-Pillow>=9.0.0          # 图像处理库（如果需要预览或其他图像处理功能）
+Pillow>=9.0.0          # 图像处理库
 
-# GUI增强（可选）
-ttkthemes>=3.2.0       # 美化GUI主题
-ttkwidgets>=0.12.0     # 额外的tkinter部件
-
-# 开发工具（可选）
-pytest>=7.0.0          # 测试框架
-black>=22.0.0          # 代码格式化
-flake8>=4.0.0          # 代码检查
-tkinterdnd2>=3.9.0    # 拖放支持
+# GUI增强
+tkinterdnd2>=0.4.2     # 修改为最新的可用版本

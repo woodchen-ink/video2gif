@@ -8,7 +8,14 @@ import webbrowser
 from threading import Thread
 import ffmpeg
 import traceback  # 用于打印详细错误信息
-from tkinterdnd2 import *  # 导入拖放支持
+
+try:
+    from tkinterdnd2 import *
+
+    SUPPORT_DND = True
+except ImportError:
+    SUPPORT_DND = False
+    print("Warning: tkinterdnd2 not available, drag and drop support will be disabled")
 
 
 class FFmpegInstaller:
@@ -263,12 +270,19 @@ class FFmpegInstaller:
 class VideoToGifConverter:
     def __init__(self):
         self.check_ffmpeg_installation()
-        self.root = TkinterDnD.Tk()  # 使用支持拖放的Tk
+
+        # 根据是否支持拖放来创建不同的根窗口
+        if SUPPORT_DND:
+            self.root = TkinterDnD.Tk()
+        else:
+            self.root = tk.Tk()
+
         self.root.title("视频转GIF工具")
 
-        # 启用文件拖放
-        self.root.drop_target_register(DND_FILES)
-        self.root.dnd_bind("<<Drop>>", self.handle_drop)
+        # 只在支持拖放时启用相关功能
+        if SUPPORT_DND:
+            self.root.drop_target_register(DND_FILES)
+            self.root.dnd_bind("<<Drop>>", self.handle_drop)
 
         self.setup_ui()
 
@@ -461,6 +475,14 @@ class VideoToGifConverter:
         # 状态标签
         self.status_label = ttk.Label(self.root, text="就绪")
         self.status_label.pack(pady=5)
+        # 如果不支持拖放，添加提示
+        if not SUPPORT_DND:
+            ttk.Label(
+                self.file_frame,
+                text="注意：当前版本不支持拖放功能，请使用'选择视频'按钮",
+                wraplength=300,
+                foreground="red",
+            ).pack(pady=5)
 
     def browse_output(self):
         directory = filedialog.askdirectory()

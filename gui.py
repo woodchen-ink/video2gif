@@ -9,21 +9,6 @@ from threading import Thread
 import ffmpeg
 import traceback
 
-# 根据平台选择拖放实现
-PLATFORM = platform.system().lower()
-
-if PLATFORM == "windows":
-    try:
-        from tkinterdnd2 import DND_FILES, TkinterDnD
-
-        SUPPORT_DND = "tkdnd"
-    except ImportError:
-        SUPPORT_DND = None
-elif PLATFORM == "darwin":  # macOS
-    SUPPORT_DND = "macos"
-else:  # Linux or others
-    SUPPORT_DND = None
-
 # 设置 FFmpeg 路径
 if getattr(sys, "frozen", False):
     # 运行在 PyInstaller 打包后的环境
@@ -35,19 +20,47 @@ else:
 if ffmpeg_path not in os.environ["PATH"]:
     os.environ["PATH"] = ffmpeg_path + os.pathsep + os.environ["PATH"]
 
+# 尝试导入拖放支持
+SUPPORT_DND = False
+if platform.system().lower() == "windows":
+    try:
+        from tkinterdnd2 import DND_FILES, TkinterDnD
+
+        SUPPORT_DND = True
+    except ImportError:
+        pass
+
 
 class VideoToGifConverter:
     def __init__(self):
         # 创建主窗口
-        if SUPPORT_DND == "tkdnd":
-            self.root = TkinterDnD.Tk()
+        if SUPPORT_DND:
+            try:
+                self.root = TkinterDnD.Tk()
+            except Exception:
+                self.root = tk.Tk()
+                SUPPORT_DND = False
         else:
             self.root = tk.Tk()
 
         self.root.title("视频转GIF工具")
 
+        # 设置窗口大小和位置
+        window_width = 800
+        window_height = 600
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
         # 设置拖放支持
-        self.setup_dnd()
+        if SUPPORT_DND:
+            try:
+                self.root.drop_target_register(DND_FILES)
+                self.root.dnd_bind("<<Drop>>", self.handle_drop)
+            except Exception:
+                SUPPORT_DND = False
 
         # 设置UI
         self.setup_ui()

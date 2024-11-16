@@ -62,7 +62,7 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --name video2gif --onefile --windowed --add-data "ffmpeg/ffmpeg.exe;ffmpeg" --add-data "ffmpeg/ffprobe.exe;ffmpeg" --add-data "README.md;." launcher.py
+          pyinstaller --name video2gif --onefile --windowed --add-data "ffmpeg/ffmpeg.exe;ffmpeg" --add-data "ffmpeg/ffprobe.exe;ffmpeg" --add-data "README.md;." gui.py
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1

@@ -5,7 +5,7 @@ from PyInstaller.utils.hooks import collect_data_files
 block_cipher = None
 
 a = Analysis(
-    ['launcher.py'],
+    ['gui.py'],
     pathex=[],
     binaries=[],
     datas=[

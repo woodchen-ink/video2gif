@@ -224,11 +224,11 @@ class VideoToGifConverter:
         """根据质量设置返回 FFmpeg 调色板生成参数"""
         quality = self.quality_var.get()
         if quality == "high":
-            return "stats_mode=full:dither=sierra2_4a"
+            return "max_colors=256"
         elif quality == "medium":
-            return "stats_mode=diff:dither=bayer:bayer_scale=3"
+            return "max_colors=128"
         else:
-            return "stats_mode=single:dither=bayer:bayer_scale=5"
+            return "max_colors=64"
 
     def validate_inputs(self):
         """验证输入参数"""
@@ -358,10 +358,13 @@ class VideoToGifConverter:
                     else 0
                 ),
             )
-            _, stderr = process.communicate()
+            stdout, stderr = process.communicate()
 
             if process.returncode != 0:
-                raise RuntimeError(f"调色板生成失败: {stderr.decode()}")
+                error_msg = stderr.decode()
+                print(f"调色板生成命令: {' '.join(palette_cmd)}")
+                print(f"错误输出: {error_msg}")
+                raise RuntimeError(f"调色板生成失败: {error_msg}")
 
             # 更新状态显示
             self.status_label.config(

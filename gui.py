@@ -221,14 +221,14 @@ class VideoToGifConverter:
             self.files_list.insert(tk.END, file)
 
     def get_quality_settings(self):
-        """根据质量设置返回 FFmpeg 参数"""
+        """根据质量设置返回 FFmpeg 调色板生成参数"""
         quality = self.quality_var.get()
         if quality == "high":
-            return ["-quality", "100"]
+            return "stats_mode=full"
         elif quality == "medium":
-            return ["-quality", "75"]
+            return "stats_mode=diff"
         else:
-            return ["-quality", "50"]
+            return "stats_mode=diff:dither=bayer:bayer_scale=2"
 
     def validate_inputs(self):
         """验证输入参数"""
@@ -329,8 +329,13 @@ class VideoToGifConverter:
             if duration:
                 palette_cmd.extend(["-t", str(float(duration))])
 
-            # 添加滤镜和输出
-            palette_cmd.extend(["-vf", f"{filter_complex},palettegen", palette_path])
+            # 获取质量设置
+            quality_setting = self.get_quality_settings()
+
+            # 修改调色板生成命令中的滤镜
+            palette_cmd.extend(
+                ["-vf", f"{filter_complex},palettegen={quality_setting}", palette_path]
+            )
 
             # 打印命令用于调试
             print("调色板生成命令:", " ".join(palette_cmd))
@@ -376,12 +381,13 @@ class VideoToGifConverter:
             if duration:
                 gif_cmd.extend(["-t", str(float(duration))])
 
+            # 修改 GIF 生成命令中的滤镜
             gif_cmd.extend(
                 [
                     "-i",
                     palette_path,
                     "-lavfi",
-                    f"{filter_complex} [x]; [x][1:v] paletteuse",
+                    f"{filter_complex} [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=2",
                     output_path,
                 ]
             )

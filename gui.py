@@ -315,7 +315,6 @@ class VideoToGifConverter:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = subprocess.SW_HIDE
-
             # 运行调色板生成命令
             process = subprocess.Popen(
                 palette_cmd,
@@ -379,12 +378,7 @@ class VideoToGifConverter:
             _, stderr = process.communicate()
 
             if process.returncode != 0:
-                error_output = ""
-                try:
-                    error_output = stderr.decode("utf-8", errors="replace")
-                except Exception:
-                    error_output = str(stderr)  # Fallback to raw string representation
-                raise RuntimeError(f"GIF生成失败: {error_output}")
+                raise RuntimeError(f"GIF生成失败: {stderr.decode()}")
 
             # 删除临时调色板文件
             if os.path.exists(palette_path):

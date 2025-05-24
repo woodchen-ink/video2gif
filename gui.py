@@ -309,15 +309,23 @@ class VideoToGifConverter:
             # 打印命令用于调试
             print("调色板生成命令:", " ".join(palette_cmd))
 
+            # 创建 startupinfo 对象（用于隐藏 CMD 窗口）
+            startupinfo = None
+            if platform.system().lower() == "windows":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+
             # 运行调色板生成命令
             process = subprocess.Popen(
                 palette_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                startupinfo=(
-                    subprocess.STARTUPINFO()
+                startupinfo=startupinfo,
+                creationflags=(
+                    subprocess.CREATE_NO_WINDOW
                     if platform.system().lower() == "windows"
-                    else None
+                    else 0
                 ),
             )
             _, stderr = process.communicate()
@@ -361,16 +369,22 @@ class VideoToGifConverter:
                 gif_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                startupinfo=(
-                    subprocess.STARTUPINFO()
+                startupinfo=startupinfo,
+                creationflags=(
+                    subprocess.CREATE_NO_WINDOW
                     if platform.system().lower() == "windows"
-                    else None
+                    else 0
                 ),
             )
             _, stderr = process.communicate()
 
             if process.returncode != 0:
-                raise RuntimeError(f"GIF生成失败: {stderr.decode()}")
+                error_output = ""
+                try:
+                    error_output = stderr.decode("utf-8", errors="replace")
+                except Exception:
+                    error_output = str(stderr)  # Fallback to raw string representation
+                raise RuntimeError(f"GIF生成失败: {error_output}")
 
             # 删除临时调色板文件
             if os.path.exists(palette_path):

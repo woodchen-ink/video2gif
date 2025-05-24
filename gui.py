@@ -140,22 +140,6 @@ class VideoToGifConverter:
         self.duration_entry.pack(side="left", padx=5)
         ttk.Label(duration_frame, text="(留空表示全部)").pack(side="left", padx=5)
 
-        # 质量设置
-        quality_frame = ttk.Frame(self.settings_frame)
-        quality_frame.pack(fill="x", padx=5, pady=5)
-
-        ttk.Label(quality_frame, text="质量设置:").pack(side="left", padx=5)
-        self.quality_var = tk.StringVar(value="medium")
-        ttk.Radiobutton(
-            quality_frame, text="高质量", variable=self.quality_var, value="high"
-        ).pack(side="left", padx=5)
-        ttk.Radiobutton(
-            quality_frame, text="中等", variable=self.quality_var, value="medium"
-        ).pack(side="left", padx=5)
-        ttk.Radiobutton(
-            quality_frame, text="低质量", variable=self.quality_var, value="low"
-        ).pack(side="left", padx=5)
-
         # 输出设置
         output_frame = ttk.Frame(self.settings_frame)
         output_frame.pack(fill="x", padx=5, pady=5)
@@ -219,16 +203,6 @@ class VideoToGifConverter:
         self.files_list.delete(0, tk.END)
         for file in files:
             self.files_list.insert(tk.END, file)
-
-    def get_quality_settings(self):
-        """根据质量设置返回 FFmpeg 参数"""
-        quality = self.quality_var.get()
-        if quality == "high":
-            return ["-quality", "100"]
-        elif quality == "medium":
-            return ["-quality", "75"]
-        else:
-            return ["-quality", "50"]
 
     def validate_inputs(self):
         """验证输入参数"""
@@ -335,33 +309,21 @@ class VideoToGifConverter:
             # 打印命令用于调试
             print("调色板生成命令:", " ".join(palette_cmd))
 
-            # 创建 startupinfo 对象（用于隐藏 CMD 窗口）
-            startupinfo = None
-            if platform.system().lower() == "windows":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = subprocess.SW_HIDE
             # 运行调色板生成命令
             process = subprocess.Popen(
                 palette_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                startupinfo=startupinfo,
-                creationflags=(
-                    subprocess.CREATE_NO_WINDOW
+                startupinfo=(
+                    subprocess.STARTUPINFO()
                     if platform.system().lower() == "windows"
-                    else 0
+                    else None
                 ),
             )
             _, stderr = process.communicate()
 
             if process.returncode != 0:
-                error_output = ""
-                try:
-                    error_output = stderr.decode("utf-8", errors="replace")
-                except Exception:
-                    error_output = str(stderr)  # Fallback to raw string representation
-                raise RuntimeError(f"调色板生成失败: {error_output}")
+                raise RuntimeError(f"调色板生成失败: {stderr.decode()}")
 
             # 更新状态显示
             self.status_label.config(
@@ -381,10 +343,6 @@ class VideoToGifConverter:
             if duration:
                 gif_cmd.extend(["-t", str(float(duration))])
 
-            # 获取并添加质量设置
-            quality_settings = self.get_quality_settings()
-            gif_cmd.extend(quality_settings)
-
             gif_cmd.extend(
                 [
                     "-i",
@@ -403,22 +361,16 @@ class VideoToGifConverter:
                 gif_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                startupinfo=startupinfo,
-                creationflags=(
-                    subprocess.CREATE_NO_WINDOW
+                startupinfo=(
+                    subprocess.STARTUPINFO()
                     if platform.system().lower() == "windows"
-                    else 0
+                    else None
                 ),
             )
             _, stderr = process.communicate()
 
             if process.returncode != 0:
-                error_output = ""
-                try:
-                    error_output = stderr.decode("utf-8", errors="replace")
-                except Exception:
-                    error_output = str(stderr)  # Fallback to raw string representation
-                raise RuntimeError(f"GIF生成失败: {error_output}")
+                raise RuntimeError(f"GIF生成失败: {stderr.decode()}")
 
             # 删除临时调色板文件
             if os.path.exists(palette_path):

@@ -224,11 +224,11 @@ class VideoToGifConverter:
         """根据质量设置返回 FFmpeg 调色板生成参数"""
         quality = self.quality_var.get()
         if quality == "high":
-            return "stats_mode=full:dither=sierra2_4a"
+            return "stats_mode=full"
         elif quality == "medium":
-            return "stats_mode=diff:dither=bayer:bayer_scale=3"
+            return "stats_mode=diff"
         else:
-            return "stats_mode=single:dither=bayer:bayer_scale=5"
+            return "stats_mode=diff:dither=bayer:bayer_scale=2"
 
     def validate_inputs(self):
         """验证输入参数"""

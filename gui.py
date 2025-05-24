@@ -221,14 +221,14 @@ class VideoToGifConverter:
             self.files_list.insert(tk.END, file)
 
     def get_quality_settings(self):
-        """根据质量设置返回 FFmpeg 调色板生成参数"""
+        """根据质量设置返回 FFmpeg 参数"""
         quality = self.quality_var.get()
         if quality == "high":
-            return "stats_mode=full"
+            return ["-quality", "100"]
         elif quality == "medium":
-            return "stats_mode=diff"
+            return ["-quality", "75"]
         else:
-            return "stats_mode=diff:dither=bayer:bayer_scale=2"
+            return ["-quality", "50"]
 
     def validate_inputs(self):
         """验证输入参数"""
@@ -329,13 +329,8 @@ class VideoToGifConverter:
             if duration:
                 palette_cmd.extend(["-t", str(float(duration))])
 
-            # 获取质量设置
-            quality_setting = self.get_quality_settings()
-
-            # 修改调色板生成命令中的滤镜
-            palette_cmd.extend(
-                ["-vf", f"{filter_complex},palettegen={quality_setting}", palette_path]
-            )
+            # 添加滤镜和输出
+            palette_cmd.extend(["-vf", f"{filter_complex},palettegen", palette_path])
 
             # 打印命令用于调试
             print("调色板生成命令:", " ".join(palette_cmd))
@@ -361,7 +356,12 @@ class VideoToGifConverter:
             _, stderr = process.communicate()
 
             if process.returncode != 0:
-                raise RuntimeError(f"调色板生成失败: {stderr.decode()}")
+                error_output = ""
+                try:
+                    error_output = stderr.decode("utf-8", errors="replace")
+                except Exception:
+                    error_output = str(stderr)  # Fallback to raw string representation
+                raise RuntimeError(f"调色板生成失败: {error_output}")
 
             # 更新状态显示
             self.status_label.config(
@@ -381,13 +381,16 @@ class VideoToGifConverter:
             if duration:
                 gif_cmd.extend(["-t", str(float(duration))])
 
-            # 修改 GIF 生成命令中的滤镜
+            # 获取并添加质量设置
+            quality_settings = self.get_quality_settings()
+            gif_cmd.extend(quality_settings)
+
             gif_cmd.extend(
                 [
                     "-i",
                     palette_path,
                     "-lavfi",
-                    f"{filter_complex} [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=2",
+                    f"{filter_complex} [x]; [x][1:v] paletteuse",
                     output_path,
                 ]
             )
@@ -410,7 +413,12 @@ class VideoToGifConverter:
             _, stderr = process.communicate()
 
             if process.returncode != 0:
-                raise RuntimeError(f"GIF生成失败: {stderr.decode()}")
+                error_output = ""
+                try:
+                    error_output = stderr.decode("utf-8", errors="replace")
+                except Exception:
+                    error_output = str(stderr)  # Fallback to raw string representation
+                raise RuntimeError(f"GIF生成失败: {error_output}")
 
             # 删除临时调色板文件
             if os.path.exists(palette_path):
